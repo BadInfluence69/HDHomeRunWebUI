@@ -21,8 +21,4 @@ The application acts as a bridge between your HDHomeRun hardware and a web-based
 
 ---
 
-**A quick tip for your GitHub repository:**
-
-Since you mentioned that mobile devices aren't playing back the video properly, you might want to add a **Known Limitations** or **Roadmap** section. This lets contributors know that mobile playback is an area where the project is looking to improve, and it prevents users from opening "bug" reports for a feature you're already aware of.
-
 Would you like me to help you draft the specific installation commands for your README?
