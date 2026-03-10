@@ -21,4 +21,3 @@ The application acts as a bridge between your HDHomeRun hardware and a web-based
 
 ---
 
-Would you like me to help you draft the specific installation commands for your README?
