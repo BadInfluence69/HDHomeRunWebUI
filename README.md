@@ -1,13 +1,3 @@
-# HDHomeRunWebUI
-
-This is a solid project idea. Providing a lightweight, browser-based alternative to the native Silicon Dust application—especially with a focus on remote access—is something many in the self-hosted community look for.
-
-Based on your project's goals and technical stack, here is a professional and clear description you can use for your GitHub **README.md** or the project **About** section.
-
----
-
-**HDHomeRun Web UI: Live TV Anywhere**
-
 This project provides a lightweight, Flask-based web interface for HDHomeRun Gateway devices (including Flex 4K, Connect, and Prime). It allows users to stream live OTA or Cable TV directly in a web browser, eliminating the need for the official Windows application and enabling viewing from anywhere in the world.
 
 **Key Features**
