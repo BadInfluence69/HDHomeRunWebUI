@@ -1,4 +1,4 @@
-# HDHomeRun Web UI & Unified Media Hub
+# HDHomeRunWebUI
 
 A lightweight, Flask-based web interface for HDHomeRun Gateway devices (Flex 4K, Connect, and Prime) and local media libraries. This project allows you to stream live OTA/Cable TV and your personal movie/TV collection directly in a web browser, enabling high-quality viewing from anywhere in the world.
 
