@@ -175,7 +175,7 @@ def tuner(channel):
     ffmpeg_cmd = [
         'ffmpeg', '-i', target_url,
         '-vf', 'scale=-1:1080,hqdn3d=1.5:1.5:6:6,unsharp=3:3:0.5:3:3:0.5',
-        '-c:v', 'libx264', '-preset', 'ultrafast', '-tune', 'zerolatency',
+        '-c:v', 'libx265', '-preset', 'ultrafast', '-tune', 'zerolatency',
         '-crf', '20', '-c:a', 'aac', '-b:a', '192k',
         '-f', 'mp4', '-movflags', 'separate_moof+frag_keyframe+empty_moov+default_base_moof', 'pipe:1'
     ]
