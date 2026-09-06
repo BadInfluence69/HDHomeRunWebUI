@@ -13,7 +13,7 @@ app = Flask(__name__)
 # ====== CONFIGURATION ======
 MEDIA_DIR = os.path.dirname(os.path.abspath(__file__))
 EXTENSIONS = ('.mp4', '.mkv', '.avi', '.mov', '.mp3', '.wav', '.flac', '.m4a')
-HDHR_IP = "192.168.0.163"
+HDHR_IP = "192.168.0.169"
 LISTENING_PORT = 5001
 
 # --- LINEUP SETTINGS ---
@@ -130,6 +130,9 @@ def get_organized_media():
                 })
     return structured_data
 
+def count_items(section):
+    return sum(len(items) for items in section.values())
+
 # ====== 2. STREAMING & BYPASS ======
 @app.after_request
 def add_cors_headers(response):
@@ -192,95 +195,413 @@ def tuner(channel):
 # ====== 3. UNIFIED INTERFACE ======
 INDEX_HTML = """
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>The Hub | Unified Media</title>
-    <style>
-        * { box-sizing: border-box; }
-        body { background: #050505; color: #fff; font-family: 'Segoe UI', sans-serif; margin: 0; display: grid; grid-template-columns: 320px 1fr 320px; height: 100vh; overflow: hidden; }
-        .sidebar { background: #0c0c0c; border-right: 1px solid #1a1a1a; overflow-y: auto; padding: 20px; z-index: 20; }
-        .sidebar-right { border-right: none; border-left: 1px solid #1a1a1a; }
-        #center-zone { display: flex; flex-direction: column; background: #000; padding: 10px; overflow: hidden; align-items: center; justify-content: flex-start; }
-        #search-box { width: 100%; max-width: 800px; padding: 12px; margin-bottom: 15px; background: #111; border: 1px solid #333; border-radius: 20px; color: #fff; outline: none; text-align: center; z-index: 30; }
-        h2 { color: #444; font-size: 0.8em; text-transform: uppercase; letter-spacing: 2px; border-bottom: 1px solid #1a1a1a; padding-bottom: 8px; margin-top: 30px; }
-        .live-tv-header { color: #ff0000 !important; }
-        .folder-label { color: #00ffcc; font-size: 0.7em; margin-top: 15px; opacity: 0.5; }
-        .file-link { display: block; padding: 8px 12px; margin: 2px 0; border-radius: 4px; color: #888; text-decoration: none; font-size: 0.9em; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .file-link:hover { background: #1a1a1a; color: #fff; }
-        .file-link.active { background: #00ffcc; color: #000; font-weight: 600; }
-        .live-link.active { background: #ff0000; color: #fff; }
-        #player-container { width: 100%; height: 75vh; position: relative; overflow: hidden; border-radius: 8px; background: #000; }
-        video { width: 100%; height: 100%; object-fit: contain; }
-        #now-playing-info { margin-top: 15px; text-align: center; }
-        .hidden { display: none !important; }
-    </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --void:#0A0E14;
+  --panel:#111722;
+  --panel-2:#18202E;
+  --line:#222C3D;
+  --ink:#EDF1F7;
+  --ink-2:#98A4B8;
+  --ink-3:#5C6980;
+  --live:#FF9F1C;
+  --lib:#7FA8FF;
+  --sans:'Barlow','Segoe UI',system-ui,sans-serif;
+  --cond:'Barlow Condensed','Segoe UI',system-ui,sans-serif;
+}
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  margin:0; background:var(--void); color:var(--ink);
+  font-family:var(--sans); font-size:15px; line-height:1.45;
+  display:grid; grid-template-rows:auto minmax(0,1fr); height:100dvh; overflow:hidden;
+}
+
+/* ---------- header ---------- */
+.bar{
+  display:flex; align-items:center; gap:20px;
+  padding:0 20px; height:60px;
+  background:var(--panel); border-bottom:1px solid var(--line);
+}
+.brand{display:flex; align-items:baseline; gap:9px; flex:0 0 auto;}
+.brand b{font-family:var(--cond); font-weight:700; font-size:1.5rem; letter-spacing:.02em;}
+.brand span{color:var(--ink-3); font-size:.8rem;}
+.bars{display:flex; align-items:flex-end; gap:2px; height:16px; margin-right:2px;}
+.bars i{width:3px; background:var(--lib); border-radius:1px; display:block;}
+.bars i:nth-child(1){height:5px;}
+.bars i:nth-child(2){height:9px;}
+.bars i:nth-child(3){height:13px;}
+.bars i:nth-child(4){height:16px; background:var(--live);}
+
+.search{position:relative; flex:1 1 auto; max-width:560px; margin-inline:auto;}
+.search input{
+  width:100%; padding:9px 34px 9px 14px;
+  background:var(--void); border:1px solid var(--line); border-radius:8px;
+  color:var(--ink); font:inherit; font-size:.92rem; outline:none;
+}
+.search input::placeholder{color:var(--ink-3);}
+.search input:focus{border-color:var(--lib); box-shadow:0 0 0 3px rgba(127,168,255,.14);}
+.search kbd{
+  position:absolute; right:10px; top:50%; transform:translateY(-50%);
+  color:var(--ink-3); font-family:var(--cond); font-size:.85rem; pointer-events:none;
+}
+.ghost{
+  background:none; border:1px solid var(--line); color:var(--ink-2);
+  font:inherit; font-size:.85rem; padding:7px 13px; border-radius:8px; cursor:pointer;
+}
+.ghost:hover{color:var(--ink); border-color:var(--ink-3);}
+
+/* ---------- shell ---------- */
+.app{display:grid; grid-template-columns:320px minmax(0,1fr) 330px; min-height:0;}
+.rail{
+  background:var(--panel); overflow-y:auto; padding:0 12px 28px;
+  border-right:1px solid var(--line); min-height:0;
+}
+.rail.right{border-right:none; border-left:1px solid var(--line);}
+
+.head{
+  position:sticky; top:0; z-index:5;
+  display:flex; align-items:center; gap:8px;
+  padding:16px 4px 9px; margin-bottom:4px;
+  background:var(--panel); border-bottom:1px solid var(--line);
+}
+.head h2{
+  margin:0; font-family:var(--cond); font-weight:600; font-size:1.15rem;
+  letter-spacing:.01em; color:var(--ink);
+}
+.head .n{margin-left:auto; font-family:var(--cond); font-size:.95rem; color:var(--ink-3);}
+.head .dot{width:7px; height:7px; border-radius:50%; background:var(--live);}
+
+.group{margin-bottom:10px;}
+.group h3{
+  margin:14px 0 4px; padding:0 10px;
+  font-weight:500; font-size:.75rem; color:var(--ink-3); letter-spacing:.01em;
+}
+.row{
+  display:flex; align-items:center; gap:10px; width:100%;
+  padding:7px 10px; margin:1px 0; border:0; border-radius:8px;
+  background:none; color:var(--ink-2); font:inherit; font-size:.9rem;
+  text-align:left; cursor:pointer;
+}
+.row .t{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.row .num{
+  flex:0 0 auto; min-width:3.4ch; text-align:right;
+  font-family:var(--cond); font-weight:600; font-size:1rem;
+  font-variant-numeric:tabular-nums; color:var(--ink-3);
+}
+.row:hover{background:var(--panel-2); color:var(--ink);}
+.row:focus-visible{outline:2px solid var(--lib); outline-offset:-2px;}
+.row.on{background:rgba(127,168,255,.13); color:var(--ink); box-shadow:inset 2px 0 0 var(--lib);}
+.row.live.on{background:rgba(255,159,28,.13); box-shadow:inset 2px 0 0 var(--live);}
+.row.live.on .num{color:var(--live);}
+.empty{padding:10px; color:var(--ink-3); font-size:.85rem;}
+
+/* ---------- stage ---------- */
+.stage{
+  display:flex; flex-direction:column; gap:16px; align-items:center;
+  padding:22px; min-height:0; overflow:auto;
+}
+.frame{
+  position:relative; width:100%; max-width:1280px; aspect-ratio:16/9;
+  max-height:calc(100dvh - 200px);
+  background:#000; border:1px solid var(--line); border-radius:12px; overflow:hidden;
+}
+video{display:block; width:100%; height:100%; object-fit:contain; background:#000;}
+.veil{
+  position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:14px;
+  background:radial-gradient(circle at 50% 45%, #10161F 0%, #05080C 70%);
+  color:var(--ink-3); text-align:center; padding:20px;
+}
+.veil.off{display:none;}
+.veil p{margin:0; font-size:.92rem; max-width:34ch;}
+.veil strong{display:block; color:var(--ink); font-family:var(--cond); font-size:1.4rem; font-weight:600;}
+.eq{display:flex; align-items:flex-end; gap:4px; height:34px;}
+.eq i{width:5px; height:10px; border-radius:2px; background:var(--ink-3); display:block;}
+.eq.go i{background:var(--live); animation:pulse 1s ease-in-out infinite;}
+.eq.go i:nth-child(2){animation-delay:.12s;}
+.eq.go i:nth-child(3){animation-delay:.24s;}
+.eq.go i:nth-child(4){animation-delay:.36s;}
+.eq.go i:nth-child(5){animation-delay:.48s;}
+@keyframes pulse{0%,100%{height:9px;opacity:.5;} 50%{height:32px;opacity:1;}}
+
+.strip{
+  display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:18px;
+  width:100%; max-width:1280px;
+  padding:12px 16px; background:var(--panel); border:1px solid var(--line); border-radius:10px;
+}
+.badge{
+  display:flex; align-items:center; gap:7px;
+  font-family:var(--cond); font-weight:600; font-size:1rem; color:var(--ink-3);
+}
+.badge i{width:8px; height:8px; border-radius:50%; background:var(--ink-3); display:block;}
+.strip.live .badge{color:var(--live);}
+.strip.live .badge i{background:var(--live); animation:blink 2s ease-in-out infinite;}
+.strip.file .badge{color:var(--lib);}
+.strip.file .badge i{background:var(--lib);}
+@keyframes blink{0%,100%{opacity:1;} 50%{opacity:.25;}}
+#title{font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+#mode{color:var(--ink-3); font-size:.85rem; text-align:right;}
+
+.toggle{display:flex; align-items:center; gap:10px; color:var(--ink-2); font-size:.88rem; cursor:pointer;}
+.toggle input{position:absolute; opacity:0; width:0; height:0;}
+.track{
+  width:38px; height:21px; border-radius:11px; background:var(--panel-2);
+  border:1px solid var(--line); position:relative; transition:background .15s, border-color .15s;
+}
+.track::after{
+  content:""; position:absolute; top:2px; left:2px; width:15px; height:15px;
+  border-radius:50%; background:var(--ink-3); transition:transform .15s, background .15s;
+}
+.toggle input:checked + .track{background:rgba(127,168,255,.22); border-color:var(--lib);}
+.toggle input:checked + .track::after{transform:translateX(17px); background:var(--lib);}
+.toggle input:focus-visible + .track{outline:2px solid var(--lib); outline-offset:2px;}
+.hint{color:var(--ink-3); font-size:.8rem;}
+
+.hide{display:none !important;}
+::-webkit-scrollbar{width:10px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--line); border-radius:5px; border:3px solid var(--panel);}
+::-webkit-scrollbar-thumb:hover{background:var(--ink-3);}
+
+@media (max-width:1280px){ .app{grid-template-columns:260px minmax(0,1fr) 270px;} }
+@media (max-width:1000px){
+  body{overflow:auto;}
+  .app{grid-template-columns:1fr; grid-auto-rows:min-content;}
+  .rail{border:0; border-top:1px solid var(--line); max-height:none;}
+  .frame{max-height:none;}
+  .bar{flex-wrap:wrap; height:auto; padding:10px 14px; gap:10px;}
+  .search{order:3; flex-basis:100%; max-width:none;}
+}
+@media (prefers-reduced-motion:reduce){ *{animation:none !important; transition:none !important;} }
+</style>
 </head>
 <body>
-    <div class="sidebar">
-        <h2 class="live-tv-header">📡 Live Tuner</h2>
-        <div id="live-list">
-            {% for ch, name in live_channels.items() %}
-                <div class="file-link live-link" onclick="playLive('{{ ch }}', this, '{{ name }}')">📺 {{ ch }}: {{ name }}</div>
-            {% endfor %}
-        </div>
-        <h2>Movies</h2>
-        <div id="movie-list">
-            {% for folder, items in library.MOVIES.items() %}
-                <div class="folder-label">{{ folder }}</div>
-                {% for item in items %}
-                    <div class="file-link" onclick="playMedia('{{ item.path|urlencode }}', this, false, '{{ item.display_name|replace("'", "\\\\'") }}')">🎬 {{ item.display_name }}</div>
-                {% endfor %}
-            {% endfor %}
-        </div>
+
+<header class="bar">
+  <div class="brand">
+    <span class="bars"><i></i><i></i><i></i><i></i></span>
+    <b>The Hub</b>
+    <span>{{ ip }}</span>
+  </div>
+  <div class="search">
+    <input id="q" type="search" placeholder="Search channels, movies, shows and music" autocomplete="off">
+    <kbd>/</kbd>
+  </div>
+  <button class="ghost" onclick="location.reload()">Refresh lineup</button>
+</header>
+
+<div class="app">
+
+  <aside class="rail">
+    <div class="head"><span class="dot"></span><h2>Live tuner</h2><span class="n">{{ live_channels|length }}</span></div>
+    <div class="sec" data-empty="No channels match.">
+      <div class="group">
+        {% for ch, name in live_channels.items() %}
+        <button class="row live" data-kind="live" data-ch="{{ ch }}" data-name="{{ name|e }}">
+          <span class="num">{{ ch }}</span><span class="t">{{ name }}</span>
+        </button>
+        {% endfor %}
+      </div>
     </div>
-    <div id="center-zone">
-        <input type="text" id="search-box" placeholder="Search Channels or Media..." onkeyup="filterAll()">
-        <div id="player-container"><video id="player" controls autoplay></video></div>
-        <div id="now-playing-info">
-            <div id="now-playing" style="font-size: 1.1em; font-weight: bold; color: #eee;">System Standby</div>
-            <label style="font-size:0.8em; color:#444; margin-top:10px; display:block;">
-                <input type="checkbox" id="upscale-check"> Live Master 1080p Upscaler (GPU)
-            </label>
-        </div>
+
+    <div class="head"><h2>Movies</h2><span class="n">{{ counts.MOVIES }}</span></div>
+    <div class="sec" data-empty="No movies match.">
+      {% for folder, items in library.MOVIES.items() %}
+      <div class="group">
+        <h3>{{ folder }}</h3>
+        {% for item in items %}
+        <button class="row" data-kind="file" data-path="{{ item.path|urlencode }}" data-audio="{{ 'y' if item.is_audio else 'n' }}" data-name="{{ item.display_name|e }}">
+          <span class="t">{{ item.display_name }}</span>
+        </button>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="empty">Nothing here yet. Drop files into a folder with "movie" in its name.</p>
+      {% endfor %}
     </div>
-    <div class="sidebar sidebar-right">
-        <h2>TV Series</h2>
-        <div id="tv-list">
-            {% for folder, items in library.TV_SHOWS.items() %}
-                <div class="folder-label">{{ folder }}</div>
-                {% for item in items %}
-                    <div class="file-link" onclick="playMedia('{{ item.path|urlencode }}', this, false, '{{ item.display_name|replace("'", "\\\\'") }}')">📺 {{ item.display_name }}</div>
-                {% endfor %}
-            {% endfor %}
-        </div>
+  </aside>
+
+  <main class="stage">
+    <div class="frame">
+      <video id="player" controls playsinline preload="none"></video>
+      <div class="veil" id="veil">
+        <span class="eq" id="eq"><i></i><i></i><i></i><i></i><i></i></span>
+        <p><strong id="veilTitle">Nothing playing</strong>Pick a channel on the left or a title from either rail.</p>
+      </div>
     </div>
-    <script>
-        function filterAll() {
-            let input = document.getElementById('search-box').value.toLowerCase();
-            document.querySelectorAll('.file-link').forEach(item => {
-                const text = item.innerText.toLowerCase();
-                item.classList.toggle('hidden', !text.includes(input));
-            });
-        }
-        function playMedia(path, element, isAudio, cleanName) {
-            document.querySelectorAll('.file-link').forEach(el => el.classList.remove('active'));
-            element.classList.add('active');
-            const player = document.getElementById('player');
-            const useUpscale = document.getElementById('upscale-check').checked;
-            document.getElementById('now-playing').innerText = cleanName;
-            player.src = window.location.origin + "/stream/" + path + (isAudio ? "" : "?upscale=" + useUpscale);
-            player.play();
-        }
-        function playLive(ch, element, name) {
-            document.querySelectorAll('.file-link').forEach(el => el.classList.remove('active'));
-            element.classList.add('active');
-            const player = document.getElementById('player');
-            document.getElementById('now-playing').innerText = "LIVE: " + name;
-            player.src = window.location.origin + "/tuner/" + ch;
-            player.play();
-        }
-    </script>
-</body>     
+
+    <div class="strip" id="strip">
+      <span class="badge"><i></i><span id="src">Standby</span></span>
+      <span id="title">Nothing playing</span>
+      <span id="mode">Idle</span>
+    </div>
+
+    <div class="strip" style="grid-template-columns:auto minmax(0,1fr);">
+      <label class="toggle">
+        <input type="checkbox" id="up"><span class="track"></span>
+        <span>Upscale library video to 1080p on the GPU</span>
+      </label>
+      <span class="hint">Re-encodes with NVENC. Live tuner channels always upscale.</span>
+    </div>
+  </main>
+
+  <aside class="rail right">
+    <div class="head"><h2>TV series</h2><span class="n">{{ counts.TV_SHOWS }}</span></div>
+    <div class="sec" data-empty="No episodes match.">
+      {% for folder, items in library.TV_SHOWS.items() %}
+      <div class="group">
+        <h3>{{ folder }}</h3>
+        {% for item in items %}
+        <button class="row" data-kind="file" data-path="{{ item.path|urlencode }}" data-audio="{{ 'y' if item.is_audio else 'n' }}" data-name="{{ item.display_name|e }}">
+          <span class="t">{{ item.display_name }}</span>
+        </button>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="empty">No shows found. Folders need "tv", "show" or "season" in the path.</p>
+      {% endfor %}
+    </div>
+
+    <div class="head"><h2>Music</h2><span class="n">{{ counts.MUSIC }}</span></div>
+    <div class="sec" data-empty="No tracks match.">
+      {% for folder, items in library.MUSIC.items() %}
+      <div class="group">
+        <h3>{{ folder }}</h3>
+        {% for item in items %}
+        <button class="row" data-kind="file" data-path="{{ item.path|urlencode }}" data-audio="{{ 'y' if item.is_audio else 'n' }}" data-name="{{ item.display_name|e }}">
+          <span class="t">{{ item.display_name }}</span>
+        </button>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="empty">No tracks found.</p>
+      {% endfor %}
+    </div>
+  </aside>
+
+</div>
+
+<script>
+var player = document.getElementById('player');
+var strip  = document.getElementById('strip');
+var veil   = document.getElementById('veil');
+var eq     = document.getElementById('eq');
+var upBox  = document.getElementById('up');
+var q      = document.getElementById('q');
+var current = null;
+
+function setVeil(show, heading, body, busy){
+  veil.classList.toggle('off', !show);
+  eq.classList.toggle('go', !!busy);
+  if(show){
+    document.getElementById('veilTitle').textContent = heading;
+    veil.querySelector('p').lastChild.textContent = body;
+  }
+}
+
+function mark(el){
+  document.querySelectorAll('.row.on').forEach(function(r){ r.classList.remove('on'); });
+  if(el) el.classList.add('on');
+}
+
+function play(item, el){
+  current = item;
+  mark(el);
+  strip.className = 'strip ' + (item.kind === 'live' ? 'live' : 'file');
+  document.getElementById('src').textContent = item.kind === 'live' ? 'Live' : (item.audio ? 'Track' : 'Library');
+  document.getElementById('title').textContent = item.name;
+  document.getElementById('mode').textContent =
+    item.kind === 'live' ? 'Tuning channel ' + item.ch + ', denoised and sharpened to 1080p'
+    : item.audio ? 'Transcoding audio to AAC 320k'
+    : upBox.checked ? 'Upscaling to 1080p on the GPU'
+    : 'Streaming the original video, audio only re-encoded';
+
+  setVeil(true, item.kind === 'live' ? 'Tuning in' : 'Starting', 'ffmpeg is spinning up. This takes a couple of seconds.', true);
+
+  player.src = item.kind === 'live'
+    ? '/tuner/' + item.ch
+    : '/stream/' + item.path + (item.audio ? '' : '?upscale=' + upBox.checked);
+  player.play().catch(function(){});
+}
+
+document.addEventListener('click', function(e){
+  var el = e.target.closest('.row');
+  if(!el) return;
+  play({
+    kind: el.dataset.kind,
+    ch: el.dataset.ch,
+    path: el.dataset.path,
+    audio: el.dataset.audio === 'y',
+    name: el.dataset.name
+  }, el);
+});
+
+player.addEventListener('playing', function(){
+  if(current && current.audio){
+    setVeil(true, current.name, 'Audio only. Nothing to show here.', true);
+  } else {
+    setVeil(false);
+  }
+});
+player.addEventListener('waiting', function(){
+  if(current && !current.audio) setVeil(true, 'Buffering', 'Waiting on the stream to catch up.', true);
+});
+player.addEventListener('error', function(){
+  if(!current) return;
+  setVeil(true, 'Stream failed', 'ffmpeg stopped or the source is unreachable. Try another title.', false);
+  document.getElementById('mode').textContent = 'Stopped';
+});
+
+upBox.addEventListener('change', function(){
+  if(current && current.kind === 'file' && !current.audio){
+    play(current, document.querySelector('.row.on'));
+  }
+});
+
+q.addEventListener('input', function(){
+  var term = q.value.trim().toLowerCase();
+  document.querySelectorAll('.sec').forEach(function(sec){
+    var shown = 0;
+    sec.querySelectorAll('.group').forEach(function(g){
+      var hits = 0;
+      g.querySelectorAll('.row').forEach(function(r){
+        var ok = r.textContent.toLowerCase().indexOf(term) !== -1;
+        r.classList.toggle('hide', !ok);
+        if(ok) hits++;
+      });
+      g.classList.toggle('hide', hits === 0);
+      shown += hits;
+    });
+    var note = sec.querySelector('.miss');
+    if(shown === 0 && term){
+      if(!note){
+        note = document.createElement('p');
+        note.className = 'empty miss';
+        note.textContent = sec.dataset.empty;
+        sec.appendChild(note);
+      }
+      note.classList.remove('hide');
+    } else if(note){
+      note.classList.add('hide');
+    }
+  });
+});
+
+document.addEventListener('keydown', function(e){
+  if(e.key === '/' && document.activeElement !== q){ e.preventDefault(); q.focus(); }
+  if(e.key === 'Escape' && document.activeElement === q){ q.value = ''; q.dispatchEvent(new Event('input')); q.blur(); }
+});
+</script>
+</body>
 </html>
 """
 
@@ -288,7 +609,19 @@ INDEX_HTML = """
 def index():
     lineup = get_live_lineup()
     sorted_lineup = dict(sorted(lineup.items(), key=lambda x: int(x[0]) if x[0].isdigit() else 9999))
-    return render_template_string(INDEX_HTML, library=get_organized_media(), live_channels=sorted_lineup)
+    library = get_organized_media()
+    counts = {
+        "MOVIES": count_items(library["MOVIES"]),
+        "TV_SHOWS": count_items(library["TV_SHOWS"]),
+        "MUSIC": count_items(library["MUSIC"]),
+    }
+    return render_template_string(
+        INDEX_HTML,
+        library=library,
+        live_channels=sorted_lineup,
+        counts=counts,
+        ip=HDHR_IP,
+    )
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=LISTENING_PORT, threaded=True)
